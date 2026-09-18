@@ -1,7 +1,6 @@
 #ifndef LOADCELL_CONTROL_H
 #define LOADCELL_CONTROL_H
 
-void setupLoadCell();
-void runLoadCell();
+void vLoadCellTask(void *pvParameters);
 
 #endif

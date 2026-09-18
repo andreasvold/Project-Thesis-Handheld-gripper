@@ -1,20 +1,33 @@
 #include <Arduino.h>
+#include <Arduino_FreeRTOS.h> // Fixed: provides xTaskCreate, TaskHandle_t, vTaskDelete
 #include "stepper_control.h"
 #include "loadcell_control.h"
 
+TaskHandle_t stepperTaskHandle = NULL;
+TaskHandle_t loadCellTaskHandle = NULL;
+
 void setup() {
-  Serial.begin(9600);
-  
-  // Call initialization routines from separate files
-  setupStepper();
-  setupLoadCell();
+  Serial.begin(115200);
+
+  xTaskCreate(
+    vStepperTask,
+    "StepperTask",
+    128,            // Note: On AVR/Uno, stack is in words (128 words = 256 bytes)
+    NULL,
+    2,
+    &stepperTaskHandle
+  );
+
+  xTaskCreate(
+    vLoadCellTask,
+    "LoadCellTask",
+    128,            // Keep stack allocations small on Uno (2KB SRAM total)
+    NULL,
+    1,
+    &loadCellTaskHandle
+  );
 }
 
 void loop() {
-  // Call operational routines sequentially
-  runLoadCell();
-  runStepper();
-  
-  // Adjusted timing delay so the loop runs fluidly
-  delay(50); 
+  // Empty loop: FreeRTOS scheduler manages execution automatically on AVR
 }

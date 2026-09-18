@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Arduino_FreeRTOS.h> // Fixed: provides FreeRTOS definitions and pdMS_TO_TICKS
 #include "stepper_control.h"
 
 const int STEP_PIN = 10; 
@@ -16,27 +17,30 @@ void setupStepper() {
   digitalWrite(ENA_PIN, LOW);
   digitalWrite(DIR_PIN, LOW);
   digitalWrite(STEP_PIN, LOW);
-  delay(1000); 
 }
 
-void runStepper() {
-  // --- Move Forward ---
-  digitalWrite(DIR_PIN, HIGH);
-  for (int i = 0; i < STEPS_PER_DIRECTION; i++) {
-    digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(STEP_DELAY_US);
-    digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(STEP_DELAY_US);
-  }
-  delay(500); 
+void vStepperTask(void *pvParameters) {
+  setupStepper();
 
-  // --- Move Backward ---
-  digitalWrite(DIR_PIN, LOW);
-  for (int i = 0; i < STEPS_PER_DIRECTION; i++) {
-    digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(STEP_DELAY_US);
-    digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(STEP_DELAY_US);
+  for (;;) {
+    // --- Move Forward ---
+    digitalWrite(DIR_PIN, HIGH);
+    for (int i = 0; i < STEPS_PER_DIRECTION; i++) {
+      digitalWrite(STEP_PIN, HIGH);
+      delayMicroseconds(STEP_DELAY_US);
+      digitalWrite(STEP_PIN, LOW);
+      delayMicroseconds(STEP_DELAY_US);
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // --- Move Backward ---
+    digitalWrite(DIR_PIN, LOW);
+    for (int i = 0; i < STEPS_PER_DIRECTION; i++) {
+      digitalWrite(STEP_PIN, HIGH);
+      delayMicroseconds(STEP_DELAY_US);
+      digitalWrite(STEP_PIN, LOW);
+      delayMicroseconds(STEP_DELAY_US);
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
-  delay(500); 
 }
