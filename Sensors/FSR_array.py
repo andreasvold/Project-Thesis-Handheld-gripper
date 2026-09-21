@@ -4,26 +4,31 @@ import numpy as np
 import time
 
 # Serial port configuration
-SERIAL_PORT = 'COM4'  # Replace with your port (e.g., '/dev/ttyUSB0' on Linux/Mac)
-BAUD_RATE = 115200
+SERIAL_PORT = 'COM5'  # Replace with your port (e.g., '/dev/ttyUSB0' on Linux/Mac)
+BAUD_RATE = 9600
 
-# Heatmap dimensions (2 rows x 6 columns)
-ROWS = 2
-COLS = 6
+# Heatmap dimensions
+ROWS = 4
+COLS = 4
 
-def parse_heatmap(serial_data):
-    lines = serial_data.strip().split('\n')
+def parse_heatmap(ser):
+    """Reads lines from serial until a complete matrix is collected."""
+    # Wait until we see the start line
+    while True:
+        line = ser.readline().decode('utf-8', errors='ignore').strip()
+        if line == "START":
+            break
+
     heatmap = []
-
-    for line in lines:
-        if not line.strip() or "Heatmap" in line:
-            continue
+    # Read the next ROWS lines
+    for _ in range(ROWS):
+        line = ser.readline().decode('utf-8', errors='ignore').strip()
         try:
-            values = list(map(int, line.strip().split()))
+            values = list(map(int, line.split()))
             if len(values) == COLS:
                 heatmap.append(values)
         except ValueError:
-            continue  # Ignore lines that don't parse
+            continue
 
     return np.array(heatmap)
 
@@ -38,8 +43,7 @@ def main():
 
     while True:
         try:
-            raw_data = ser.read(ser.inWaiting()).decode('utf-8', errors='ignore')
-            new_heatmap = parse_heatmap(raw_data)
+            new_heatmap = parse_heatmap(ser)
             if new_heatmap.shape == (ROWS, COLS):
                 im.set_data(new_heatmap)
                 ax.set_title("Live Heatmap from Arduino")

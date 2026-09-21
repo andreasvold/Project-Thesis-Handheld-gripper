@@ -21,7 +21,7 @@ void setup() {
   xTaskCreate(
     vLoadCellTask,
     "LoadCellTask",
-    128,            // Keep stack allocations small on Uno (2KB SRAM total)
+    256,            // Keep stack allocations small on Uno (2KB SRAM total)
     NULL,
     1,
     &loadCellTaskHandle
