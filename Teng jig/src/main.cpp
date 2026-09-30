@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <Arduino_FreeRTOS.h> // Fixed: provides xTaskCreate, TaskHandle_t, vTaskDelete
+#include <Arduino_FreeRTOS.h>
 #include "stepper_control.h"
 #include "loadcell_control.h"
 
@@ -9,25 +9,17 @@ TaskHandle_t loadCellTaskHandle = NULL;
 void setup() {
   Serial.begin(115200);
 
-  xTaskCreate(
-    vStepperTask,
-    "StepperTask",
-    128,            // Note: On AVR/Uno, stack is in words (128 words = 256 bytes)
-    NULL,
-    2,
-    &stepperTaskHandle
-  );
-
-  xTaskCreate(
-    vLoadCellTask,
-    "LoadCellTask",
-    256,            // Keep stack allocations small on Uno (2KB SRAM total)
-    NULL,
-    1,
-    &loadCellTaskHandle
-  );
+  // NOTE: on AVR the stack depth is in BYTES (StackType_t is uint8_t), not words.
+  xTaskCreate(vStepperTask,  "Stepper",  192, NULL, 2, &stepperTaskHandle);
+  xTaskCreate(vLoadCellTask, "LoadCell", 256, NULL, 1, &loadCellTaskHandle);
 }
 
 void loop() {
-  // Empty loop: FreeRTOS scheduler manages execution automatically on AVR
+  // Optional: uncomment to see how much stack each task has left (bytes).
+  // Trim or grow the sizes above based on this.
+  // Serial.print(F("Stack free  stepper: "));
+  // Serial.print(uxTaskGetStackHighWaterMark(stepperTaskHandle));
+  // Serial.print(F("  loadcell: "));
+  // Serial.println(uxTaskGetStackHighWaterMark(loadCellTaskHandle));
+  // delay(2000);
 }

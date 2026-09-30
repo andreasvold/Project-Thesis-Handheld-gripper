@@ -2,11 +2,11 @@
 
 // Replace 4 and 2 with your actual Send and Receive pins!
 // CapacitiveSensor cs(sendPin, receivePin)
-CapacitiveSensor cs = CapacitiveSensor(7, 8); 
+CapacitiveSensor cs = CapacitiveSensor(2, 7); 
 
 void setup() {
   Serial.begin(9600);
-  cs.set_CS_AutocaL_Millis(0xFFFFFFFF); // Disable auto-calibration reset
+  cs.set_CS_AutocaL_Millis(0xFFFFFFFF);
 }
 
 void loop() {
