@@ -2,50 +2,43 @@
 
 #include <Arduino.h>
 
-// Settings for one capacitive taxel channel.
+// Settings for the capacitive taxel readout.
 struct CapSensorConfig {
-  uint8_t  excitePin = 9;    // drives C_ref with a square wave
-  uint8_t  sensePin  = A0;   // reads node B (op-amp output, pin 6)
-  uint16_t settleUs  = 5;    // wait after each edge before sampling
-  uint16_t holdUs    = 300;  // time spent in each half-cycle after sampling
-  uint16_t cycles    = 64;   // cycles averaged per measurement
+  uint8_t  sensePin = A0;    // reads node B (op-amp output, pin 6)
+  uint16_t exciteHz = 500;   // square-wave frequency on D9 (16 Hz - 50 kHz)
 };
 
-// Synchronous (software) demodulation of a capacitive divider.
+// Drives the excitation square wave and reads node B directly.
 //
-// Each cycle the class drives the excitation pin high, samples node B
-// just after the rising edge, drives it low, samples just after the
-// falling edge, and accumulates (high - low). Averaging over many cycles
-// acts as the low-pass filter: slow drift and mains hum appear in both
-// samples and cancel, while the step caused by the excitation remains.
+// The excitation runs on Timer1 in hardware, so it is fixed to pin D9
+// (OC1A on the Uno) and keeps running steadily while the ADC samples.
+// No demodulation or filtering is done: read() and capture() return
+// the raw ADC values (0-1023) at node B.
 class CapSensor {
 public:
   explicit CapSensor(const CapSensorConfig& cfg = CapSensorConfig());
 
-  // Configure pins. Call once in setup().
+  // Configure pins and start the excitation. Call once in setup().
   void begin();
 
-  // One measurement: average step size in ADC counts.
-  float measure();
+  void startExcitation();
+  void stopExcitation();     // D9 held low
+  bool excitationRunning() const { return running_; }
 
-  // Average several measurements with the sensor untouched and store
-  // the result as the baseline. Returns the baseline.
-  float calibrate(uint8_t samples = 16);
+  // Actual excitation frequency after rounding to the timer's steps.
+  float exciteHz() const;
 
-  float baseline() const { return baseline_; }
+  // One raw sample of node B (0-1023).
+  int read();
 
-  // Reading minus baseline.
-  float delta(float reading) const { return reading - baseline_; }
-
-  void setCycles(uint16_t cycles) { cfg_.cycles = cycles ? cycles : 1; }
-  const CapSensorConfig& config() const { return cfg_; }
+  // Take n back-to-back raw samples of node B.
+  // levels (optional, may be nullptr) receives the D9 state (0/1)
+  // at each sample, so the waveform can be lined up with the excitation.
+  // Returns the average time between samples in microseconds.
+  float capture(uint16_t* samples, uint8_t* levels, uint16_t n);
 
 private:
-  void exciteHigh();
-  void exciteLow();
-
-  CapSensorConfig   cfg_;
-  volatile uint8_t* out_;
-  uint8_t           mask_;
-  float             baseline_;
+  CapSensorConfig cfg_;
+  uint16_t        ocr_;
+  bool            running_;
 };
