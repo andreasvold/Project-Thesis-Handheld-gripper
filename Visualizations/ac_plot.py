@@ -14,18 +14,16 @@ Keys (click the plot window first):
 
 import re
 import time
-
 import matplotlib
-
-try:
-    matplotlib.use("Qt5Agg")
-except ImportError:
-    pass
-
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import serial
 import serial.tools.list_ports
+
+try:
+    matplotlib.use('Qt5Agg')
+except ImportError:
+    pass
 
 BAUD_RATE = 9600      # must match Serial.begin() in main.cpp
 MAX_POINTS = 300
@@ -89,7 +87,7 @@ def reset_buffers():
 
 
 # --- Plot setup ---
-fig, ax = plt.subplots(figsize=(9, 4.5))
+fig, ax = plt.subplots(figsize=(8, 4))
 line_a, = ax.plot([], [], color="limegreen", linewidth=1.5)
 line_b, = ax.plot([], [], color="dodgerblue", linewidth=1.2)
 zero_line = ax.axhline(0, color="gray", linewidth=0.8, linestyle=":")
