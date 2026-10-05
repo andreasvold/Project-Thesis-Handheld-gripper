@@ -4,7 +4,7 @@
 
 // Settings for the capacitive taxel readout.
 struct CapSensorConfig {
-  uint8_t  sensePin = A0;    // reads node B (op-amp output, pin 6)
+  uint8_t  sensePin = A0;    // reads node B (op-amp output)
   uint16_t exciteHz = 500;   // square-wave frequency on D9 (16 Hz - 50 kHz)
 };
 

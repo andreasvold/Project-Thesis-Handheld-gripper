@@ -1,12 +1,4 @@
 // Capacitive taxel readout - Arduino Uno, raw node B waveform
-//
-// Wiring:
-//   D9  -> C_ref (few pF) -> node A
-//   node A -> sensor inner plate; sensor outer plate -> GND
-//   node A -> 10 MOhm -> 5V and node A -> 10 MOhm -> GND
-//   node A -> OPA340 pin 3; pin 2 tied to pin 6; pin 6 -> A0
-//   OPA340 pin 7 -> 5V, pin 4 -> GND, 100 nF across 7 and 4
-//
 // D9 outputs a steady square wave (Timer1). Each loop the Arduino
 // captures N raw samples of node B and sends one line:
 //
@@ -37,34 +29,18 @@ void printExcitation() {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   sensor.begin();
   delay(200);                  // let node A settle
   printExcitation();
 }
 
 void loop() {
-  if (Serial.available()) {
-    char c = Serial.read();
-    if (c == 'x') {
-      if (sensor.excitationRunning()) sensor.stopExcitation();
-      else                            sensor.startExcitation();
-      printExcitation();
-    }
-  }
+  // Direct analog read on pin A0
+  int val = analogRead(A0);
 
-  float dt = sensor.capture(samples, levels, N);
-
-  Serial.print(F("wave:"));
-  Serial.print(dt, 1);
-  Serial.print(':');
-  for (uint16_t i = 0; i < N; i++) {
-    if (i) Serial.print(',');
-    Serial.print(samples[i]);
-  }
-  Serial.print(':');
-  for (uint16_t i = 0; i < N; i++) {
-    Serial.print(levels[i] ? '1' : '0');
-  }
-  Serial.println();
+  // Print raw integer directly over serial
+  Serial.println(val);
+  //delayMicroseconds(1);
+  delayMicroseconds(200);
 }
