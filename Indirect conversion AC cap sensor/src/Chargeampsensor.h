@@ -18,11 +18,11 @@
 // Using both polarities cancels leakage drift and any switch charge-injection offset.
 
 struct ChargeAmpConfig {
-  float   feedbackCap_pF = 4.7f;  // the feedback capacitor C in your circuit
+  float   feedbackCap_pF = 1.0f;  // the feedback capacitor C in your circuit
   float   driveVolts     = 5.0f;  // logic-high level of D9/D10 (Uno on 5 V)
   float   adcRefVolts    = 5.0f;  // ADC reference (default AVcc)
   uint8_t resetUs        = 5;     // how long the 4066 stays closed
-  uint8_t settleUs       = 10;    // wait after reset and after each edge, before sampling
+  uint8_t settleUs       = 5;    // wait after reset and after each edge, before sampling
   uint8_t adcPrescaler   = 32;    // 16, 32, 64 or 128 (128 = Arduino default, slowest)
 };
 
@@ -35,7 +35,6 @@ class ChargeAmpSensor {
 
   // One full A+B cycle. Returns stepB - stepA in ADC counts (2x signal).
   int32_t rawCycle();
-
   // Average over N cycles. Return value is the signal in ADC counts, tare removed.
   float readCounts(uint16_t averages = 64);
 
@@ -48,6 +47,14 @@ class ChargeAmpSensor {
   // Store the current reading as zero. Call with no force applied.
   void tare(uint16_t averages = 256);
 
+  // Getter functions
+  int32_t getStepA() const;
+  int32_t getStepB() const;
+  int16_t a0() const;
+  int16_t a1() const;
+  int16_t b0() const;
+  int16_t b1() const;
+
  private:
   float _offsetCounts = 0.0f;
 
@@ -55,4 +62,14 @@ class ChargeAmpSensor {
   void  driveState(bool csHigh);           // sets D9 and D10 in one port write
   void  pulseReset();
   void  setAdcPrescaler(uint8_t p);
+  int32_t nullCycle();
+  int32_t stepA = 0;  // Member variables
+  int32_t stepB = 0;
+  int16_t _a0 = 0;
+  int16_t _a1 = 0;
+  int16_t _b0 = 0;
+  int16_t _b1 = 0;
+
+
+
 };

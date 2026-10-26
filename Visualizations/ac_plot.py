@@ -51,7 +51,7 @@ def update(_frame):
                 raw_val = float(line_str)
 
             # Convert 10-bit ADC value (0-1023) to Voltage
-            GAIN = 10.0  # 10x software boost
+            GAIN = 1.0  # 100x software boost
             voltage = ((raw_val / 1023.0) * V_REF) * GAIN
             
             y_data.append(voltage)

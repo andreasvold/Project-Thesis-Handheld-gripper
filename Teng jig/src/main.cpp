@@ -11,7 +11,7 @@ void setup() {
 
   // NOTE: on AVR the stack depth is in BYTES (StackType_t is uint8_t), not words.
   xTaskCreate(vStepperTask,  "Stepper",  192, NULL, 2, &stepperTaskHandle);
-  xTaskCreate(vLoadCellTask, "LoadCell", 256, NULL, 1, &loadCellTaskHandle);
+  //xTaskCreate(vLoadCellTask, "LoadCell", 256, NULL, 1, &loadCellTaskHandle);
 }
 
 void loop() {
