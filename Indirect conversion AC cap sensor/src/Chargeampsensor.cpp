@@ -1,56 +1,101 @@
 #include "ChargeAmpSensor.h"
 
-// ATmega328P (Uno): D8 = PB0, D9 = PB1, D10 = PB2
-#define RESET_BIT _BV(PB0)
-#define CS_BIT    _BV(PB1)
-#define CREF_BIT  _BV(PB2)
+// ATmega328P (Uno): D5 = PD5, D6 = PD6, D7 = PD7
+#define RESET_BIT _BV(PD5)
+#define CS_BIT    _BV(PD6)
+#define CREF_BIT  _BV(PD7)
 
 void ChargeAmpSensor::begin() {
-  DDRB |= RESET_BIT | CS_BIT | CREF_BIT;       // D8, D9, D10 as outputs
-  PORTB &= ~RESET_BIT;                          // switch open
-  driveState(false);                            // Cs low, Cref high
+  DDRD |= RESET_BIT | CS_BIT | CREF_BIT; // Pins 5, 6, 7 as outputs
+  PORTD &= ~RESET_BIT;                    // Reset switch open (LOW)
+  driveState(false);                      // Cs low, Cref high
   setAdcPrescaler(cfg.adcPrescaler);
-  delay(100);                                   // let the 2.5 V reference settle (tau ~5 ms)
+  delay(100);                             // Let 2.5V reference settle
   _offsetCounts = 0.0f;
+}
+
+int32_t ChargeAmpSensor::getStepA() const {
+  return stepA;
+}
+
+int32_t ChargeAmpSensor::getStepB() const {
+  return stepB;
+}
+
+int16_t ChargeAmpSensor::a0() const {
+  return _a0;
+}
+
+int16_t ChargeAmpSensor::a1() const {
+  return _a1;
+}
+
+int16_t ChargeAmpSensor::b0() const {
+  return _b0;
+}
+
+int16_t ChargeAmpSensor::b1() const {
+  return _b1;
 }
 
 void ChargeAmpSensor::driveState(bool csHigh) {
   // One read-modify-write, so both edges happen together.
-  uint8_t p = PORTB & ~(CS_BIT | CREF_BIT);
+  uint8_t p = PORTD & ~(CS_BIT | CREF_BIT);
   p |= csHigh ? CS_BIT : CREF_BIT;
-  PORTB = p;
+  PORTD = p;
+}
+int32_t ChargeAmpSensor::nullCycle() {
+  noInterrupts();
+  driveState(false);
+  pulseReset();
+  int16_t a0 = analogRead(A0);
+  delayMicroseconds(cfg.settleUs);   // same wait, but NO edge
+  int16_t a1 = analogRead(A0);
+  interrupts();
+  stepA = (int32_t)a1 - a0;
+  return stepA;
 }
 
 void ChargeAmpSensor::pulseReset() {
-  PORTB |= RESET_BIT;                           // close 4066: shorts feedback C
+  PORTD |= RESET_BIT;                           // close 4066: shorts feedback C
   delayMicroseconds(cfg.resetUs);
-  PORTB &= ~RESET_BIT;                          // open again
+  PORTD &= ~RESET_BIT;                          // open again
   delayMicroseconds(cfg.settleUs);              // let switch charge injection settle
 }
 
-int32_t ChargeAmpSensor::rawCycle() {
+ int32_t ChargeAmpSensor::rawCycle() {
   noInterrupts();  // keeps the timing between reset, edge and sample repeatable
 
   // Step A: D9 rising, D10 falling
   driveState(false);
   pulseReset();
-  int16_t a0 = analogRead(A0);                  // baseline
+  int16_t rA0 = analogRead(A0);                 // baseline
   driveState(true);                             // edge
   delayMicroseconds(cfg.settleUs);
-  int16_t a1 = analogRead(A0);
+  int16_t rA1 = analogRead(A0);
 
   // Step B: D9 falling, D10 rising
-  pulseReset();
-  int16_t b0 = analogRead(A0);                  // baseline
+  pulseReset(); // since stepB is quite a lot lower than stepA something is probably happening with the reset, settlingtime or something
+                // should investigate this.
+                // the 4066 switch leaks, which could cause changes between stepA and step. One thing to try is shortening the time window between readings, to see if they become more similar.
+                // also the baselines may jitter between the steps. However the size difference is conistent across many readings, so probably not this. 
+
+  int16_t rB0 = analogRead(A0);                 // baseline
   driveState(false);                            // edge
   delayMicroseconds(cfg.settleUs);
-  int16_t b1 = analogRead(A0);
+  int16_t rB1 = analogRead(A0);
 
   interrupts();
 
-  int32_t stepA = (int32_t)a1 - a0;             // negative if Cs > Cref
-  int32_t stepB = (int32_t)b1 - b0;             // positive if Cs > Cref
-  return stepB - stepA;
+  // Store raw samples for the getters (outside the interrupt-off window)
+  _a0 = rA0;
+  _a1 = rA1;
+  _b0 = rB0;
+  _b1 = rB1;
+
+  stepA = (int32_t)rA1 - rA0;   // negative if Cs > Cref
+  stepB = (int32_t)rB1 - rB0;   // positive if Cs > Cref
+  return (stepB - stepA);
 }
 
 float ChargeAmpSensor::measureCounts(uint16_t averages) {
