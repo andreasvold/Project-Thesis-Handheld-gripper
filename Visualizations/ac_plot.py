@@ -5,7 +5,7 @@ from matplotlib.animation import FuncAnimation
 
 BAUD_RATE = 115200
 MAX_SAMPLES = 500  # Number of samples visible on screen at once
-V_REF = 5.0        # Set to 3.3 if using a 3.3V board/reference
+V_REF = 5.0       # Set to 3.3 if using a 3.3V board/reference
 
 # --- Auto-detect Arduino Port ---
 def get_port():

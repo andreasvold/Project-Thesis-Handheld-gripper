@@ -8,7 +8,7 @@ import serial.tools.list_ports
 
 BAUD_RATE = 115200
 RECORD_SECONDS = 3.0
-V_REF = 5.0
+V_REF = 1.1
 MAX_FREQ = 500
 
 

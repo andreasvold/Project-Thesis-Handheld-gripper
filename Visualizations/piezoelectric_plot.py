@@ -9,7 +9,7 @@ from scipy.signal import butter, lfilter, lfilter_zi
 
 BAUD_RATE = 115200
 MAX_SAMPLES = 1000  # Number of samples visible on screen at once
-V_REF = 5.0  # Set to 3.3 if using a 3.3V board/reference
+V_REF = 1.1  # Set to 3.3 if using a 3.3V board/reference
 
 # --- High-pass filter settings ---
 FS = 2500.0  # Sample rate of the data stream in Hz (see note below)

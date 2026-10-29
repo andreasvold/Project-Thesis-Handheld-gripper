@@ -3,6 +3,7 @@
 void setup() {
   // Initialize serial communication at a fast baud rate
   Serial.begin(115200);
+  analogReference(INTERNAL);
 }
 
 void loop() {
