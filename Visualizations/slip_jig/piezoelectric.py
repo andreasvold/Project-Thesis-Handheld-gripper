@@ -9,7 +9,7 @@ from scipy.signal import butter, lfilter, lfilter_zi
 # --- Configuration ---
 BAUD_RATE = 250000  # Increased baud rate for dual-sensor high-speed stream
 MAX_SAMPLES = 1000  # Number of samples visible on screen at once
-V_REF = 1.1
+V_REF = 5.0
 
 # --- High-pass filter settings for the Piezo sensor ---
 FS = 2500.0  # Estimated sample rate in Hz

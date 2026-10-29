@@ -5,9 +5,6 @@ const int piezoPin  = A1; // Piezoelectric sensor pin (change if using a differe
 
 void setup() {
   Serial.begin(250000);
-  
-  // Set internal 1.1V reference for higher sensitivity on analog inputs
-  analogReference(INTERNAL); 
 }
 
 void loop() {

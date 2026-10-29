@@ -8,7 +8,7 @@ from scipy.signal import butter, lfilter, lfilter_zi
 
 # --- Configuration ---
 BAUD_RATE = 250000
-V_REF = 1.1  # Changed to 1.1V internal reference
+V_REF = 5.0
 
 # --- High-pass filter settings for the Piezo sensor ---
 HP_CUTOFF = 100.0  
@@ -130,7 +130,7 @@ fig, (ax_slider, ax_raw_piezo, ax_hp_piezo) = plt.subplots(3, 1, figsize=(10, 7)
 
 # 1. Slider Plot
 ax_slider.plot(time_axis, slider_arr, color="mediumseagreen", linewidth=1.2)
-ax_slider.set_title(f"1. Slider Potentiometer Position (Δ = {slider_delta:+.3f}V) [1.1V Ref]")
+ax_slider.set_title(f"1. Slider Potentiometer Position (Δ = {slider_delta:+.3f}V) [5V Ref]")
 ax_slider.set_ylabel("Voltage (V)")
 ax_slider.set_ylim(-0.05, V_REF + 0.05)
 ax_slider.grid(True, linestyle="--", alpha=0.5)
