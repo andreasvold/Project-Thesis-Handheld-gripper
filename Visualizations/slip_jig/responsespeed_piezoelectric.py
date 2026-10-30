@@ -36,15 +36,41 @@ if not port:
 ser = serial.Serial(port, BAUD_RATE, timeout=0.001)
 print(f"Connected to {port} at {BAUD_RATE} baud (V_REF = {V_REF}V).")
 
-# --- Interactive Trial Trigger ---
-input("Press [ENTER] to arm trial (Recording starts in 1 second)...")
-
-print("Waiting 1 second before recording...")
-time.sleep(0.0)
+# --- Step 1: Taring Trigger ---
+input("Press [ENTER] to perform taring (keep slider still)...")
 
 # Flush any old data lingering in the serial buffer
 ser.reset_input_buffer()
 
+print("Taring potentiometer (gathering baseline for 1 second)...")
+tare_samples = []
+tare_start_time = time.time()
+
+while time.time() - tare_start_time < 1.0:
+    if ser.in_waiting:
+        line_str = ser.readline().decode("ascii", errors="ignore").strip()
+        if "," in line_str:
+            parts = line_str.split(",")
+            if len(parts) >= 2:
+                try:
+                    s_val = float(parts[0])
+                    s_volt = (s_val / 1023.0) * V_REF
+                    tare_samples.append(s_volt)
+                except ValueError:
+                    continue
+
+if len(tare_samples) > 0:
+    tare_voltage = np.mean(tare_samples)
+else:
+    tare_voltage = 0.0
+    print("[WARNING] No valid tare samples collected, defaulting tare baseline to 0.0V.")
+
+print(f"Tare Baseline Potentiometer Value: {tare_voltage:.3f}V ({len(tare_samples)} samples)\n")
+
+# --- Step 2: Experiment Recording Trigger ---
+input("Press [ENTER] to start recording the experiment...")
+
+ser.reset_input_buffer()
 print(">>> RECORDING STARTED... Perform action now (Waiting for threshold breach) <<<")
 
 # --- Collect Data Until Threshold is Reached ---
@@ -110,7 +136,7 @@ hp_piezo_arr = np.array(hp_piezo_record)
 
 total_samples = len(slider_arr)
 actual_duration = time.time() - t_recording_start  
-true_fs = total_samples / actual_duration          
+true_fs = total_samples / actual_duration           
 
 time_axis = np.arange(total_samples) / true_fs
 
@@ -119,22 +145,45 @@ slider_end = slider_arr[-1]
 slider_delta = slider_end - slider_start
 response_time = time_axis[-1]  
 
+# Calculate displacement from the pre-experiment tare average
+pot_displacement_from_tare = slider_end - tare_voltage
+
+# --- Calculate Potentiometer Speed ---
+# Average speed: Net voltage displacement from start/tare divided by response time (V/s)
+avg_speed_from_start = abs(slider_delta) / response_time if response_time > 0 else 0.0
+avg_speed_from_tare = abs(pot_displacement_from_tare) / response_time if response_time > 0 else 0.0
+
+# Instantaneous / Peak speed: Max rate of change between adjacent samples
+dt = 1.0 / true_fs
+if total_samples > 1:
+    instantaneous_speeds = np.abs(np.diff(slider_arr)) / dt
+    peak_speed = np.max(instantaneous_speeds)
+else:
+    peak_speed = 0.0
+
 print("\n--- TRIAL RESULTS ---")
 print(f"Total samples recorded: {total_samples}")
 print(f"Measured Sample Rate (True FS): {true_fs:.1f} Hz")
 print(f"Response Time (to threshold): {response_time:.3f} seconds")
+print(f"Tare Baseline Potentiometer Value: {tare_voltage:.3f}V")
+print(f"Potentiometer Value at Vibration Trigger: {slider_end:.3f}V")
+print(f"Displacement from Tare Baseline (Trigger - Tare): {pot_displacement_from_tare:+.3f}V")
 print(f"Slider Change (Start to Trigger): {slider_start:.3f}V -> {slider_end:.3f}V (Δ = {slider_delta:+.3f}V)")
+print(f"\n--- POTENTIOMETER SPEED METRICS ---")
+print(f"Average Speed (from Tare to Trigger): {avg_speed_from_tare:.3f} V/s")
+print(f"Average Speed (Start to Trigger): {avg_speed_from_start:.3f} V/s")
+print(f"Peak Instantaneous Speed: {peak_speed:.3f} V/s")
 
 # --- Plotting Final Results ---
 fig, (ax_slider, ax_raw_piezo, ax_hp_piezo) = plt.subplots(3, 1, figsize=(10, 7), sharex=True)
 
 # 1. Slider Plot
 ax_slider.plot(time_axis, slider_arr, color="mediumseagreen", linewidth=1.2)
-ax_slider.set_title(f"1. Slider Potentiometer Position (Δ = {slider_delta:+.3f}V) [5V Ref]")
+ax_slider.set_title(f"1. Slider Potentiometer Position (Avg Speed: {avg_speed_from_tare:.2f} V/s, Peak: {peak_speed:.2f} V/s)")
 ax_slider.set_ylabel("Voltage (V)")
 ax_slider.set_ylim(-0.05, V_REF + 0.05)
 ax_slider.grid(True, linestyle="--", alpha=0.5)
-ax_slider.axhline(slider_start, color="gray", linestyle=":", alpha=0.7, label="Start")
+ax_slider.axhline(tare_voltage, color="blue", linestyle="--", alpha=0.7, label=f"Tare Baseline ({tare_voltage:.3f}V)")
 ax_slider.axhline(slider_end, color="black", linestyle=":", alpha=0.7, label="Trigger Point")
 ax_slider.legend(loc="upper left")
 

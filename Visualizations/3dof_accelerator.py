@@ -7,7 +7,7 @@ import serial.tools.list_ports
 from matplotlib.animation import FuncAnimation
 from scipy.signal import butter, lfilter, lfilter_zi
 
-BAUD_RATE = 115200
+BAUD_RATE = 250000
 MAX_SAMPLES = 1000  # Number of samples visible on screen at once
 COUNTS_PER_G = 1024.0  # MMA8452Q in the +/-2 g range: 1024 counts = 1 g
 
