@@ -1,0 +1,113 @@
+"""
+Live plot of piezo RMS vibration from Arduino (one float per line, every 20 ms).
+
+Install:  pip install pyserial matplotlib
+Run:      python piezo_plot.py            (auto-detects the port)
+          python piezo_plot.py COM5       (Windows)
+          python piezo_plot.py /dev/ttyACM0  (Linux / macOS: /dev/cu.usbmodem...)
+Close the Arduino Serial Monitor/Plotter first - only one program can own the port.
+"""
+import sys
+import csv
+import time
+import threading
+from collections import deque
+
+import serial
+import serial.tools.list_ports
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+BAUD = 9600          # must match Serial.begin()
+WINDOW_S = 10        # seconds shown on screen
+RATE_HZ = 50         # 1 value per 20 ms window
+THRESHOLD = None     # e.g. 5.0 to draw a slip-detection line (ADC counts)
+LOG_FILE = "piezo_log.csv"   # set to None to disable logging
+
+
+def find_port():
+    for p in serial.tools.list_ports.comports():
+        desc = (p.description or "").lower()
+        if any(k in desc for k in ("arduino", "ch340", "usb serial", "acm")):
+            return p.device
+    ports = serial.tools.list_ports.comports()
+    if not ports:
+        sys.exit("No serial ports found.")
+    return ports[0].device
+
+
+port = sys.argv[1] if len(sys.argv) > 1 else find_port()
+ser = serial.Serial(port, BAUD, timeout=1)
+time.sleep(2)                 # Uno resets when the port opens; wait for setup()
+ser.reset_input_buffer()
+print(f"Reading from {port}")
+
+maxlen = WINDOW_S * RATE_HZ
+times = deque(maxlen=maxlen)
+values = deque(maxlen=maxlen)
+lock = threading.Lock()
+t0 = time.perf_counter()
+running = True
+
+
+def reader():
+    writer = None
+    f = None
+    if LOG_FILE:
+        f = open(LOG_FILE, "w", newline="")
+        writer = csv.writer(f)
+        writer.writerow(["time_s", "rms_counts"])
+    while running:
+        line = ser.readline().decode(errors="ignore").strip()
+        try:
+            v = float(line)
+        except ValueError:
+            continue          # skip partial/garbled lines
+        t = time.perf_counter() - t0
+        with lock:
+            times.append(t)
+            values.append(v)
+        if writer:
+            writer.writerow([f"{t:.4f}", v])
+    if f:
+        f.close()
+
+
+threading.Thread(target=reader, daemon=True).start()
+
+fig, ax = plt.subplots(figsize=(10, 4))
+(line,) = ax.plot([], [], lw=1.2)
+if THRESHOLD is not None:
+    ax.axhline(THRESHOLD, color="r", ls="--", lw=1, label="threshold")
+    ax.legend(loc="upper left")
+ax.set_xlabel("Time [s]")
+ax.set_ylabel("RMS vibration [ADC counts]")
+ax.set_title("Piezo disc - 20 ms RMS")
+ax.grid(True, alpha=0.3)
+txt = ax.text(0.99, 0.95, "", transform=ax.transAxes, ha="right", va="top",
+              family="monospace")
+
+
+def update(_):
+    with lock:
+        if not times:
+            return line, txt
+        t = list(times)
+        v = list(values)
+    line.set_data(t, v)
+    ax.set_xlim(max(0, t[-1] - WINDOW_S), max(WINDOW_S, t[-1]))
+    top = max(v) * 1.1 + 0.5
+    ax.set_ylim(0, top)
+    txt.set_text(f"now: {v[-1]:6.2f}   max: {max(v):6.2f}")
+    return line, txt
+
+
+ani = FuncAnimation(fig, update, interval=50, blit=False, cache_frame_data=False)
+try:
+    plt.tight_layout()
+    plt.show()
+finally:
+    running = False
+    ser.close()
+    if LOG_FILE:
+        print(f"Saved data to {LOG_FILE}")
