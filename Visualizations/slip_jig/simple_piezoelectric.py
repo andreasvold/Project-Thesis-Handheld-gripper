@@ -7,7 +7,7 @@ from matplotlib.animation import FuncAnimation
 from scipy.signal import butter, lfilter, lfilter_zi
 
 # --- Configuration ---
-BAUD_RATE = 250000  # Increased baud rate for dual-sensor high-speed stream
+BAUD_RATE = 115200  # Increased baud rate for dual-sensor high-speed stream
 MAX_SAMPLES = 1000  # Number of samples visible on screen at once
 V_REF = 5.0
 

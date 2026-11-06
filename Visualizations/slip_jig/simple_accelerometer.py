@@ -6,7 +6,7 @@ import serial.tools.list_ports
 from matplotlib.animation import FuncAnimation
 
 # --- Configuration ---
-BAUD_RATE = 250000  # High baud rate for fast streaming
+BAUD_RATE = 115200  # High baud rate for fast streaming
 MAX_SAMPLES = 1000  # Number of samples visible on screen at once
 V_REF = 5.0
 ACCEL_SCALE = 1024.0  # 1024 counts = 1g for ±2g range
