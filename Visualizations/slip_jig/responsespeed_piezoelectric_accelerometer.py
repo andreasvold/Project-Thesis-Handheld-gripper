@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import serial
 import serial.tools.list_ports
-from scipy.signal import butter, lfilter, lfilter_zi
 
 # --- Cross-Platform Non-Blocking Input (for Enter key detection) ---
 try:
@@ -37,19 +36,15 @@ except ImportError:
         return False
 
 # --- Configuration ---
-BAUD_RATE = 250000       # must match Serial.begin() in the firmware
+BAUD_RATE = 250000          # must match Serial.begin() in the firmware
 V_REF = 5.0                 # ADC reference voltage (3.3 on 3.3 V boards)
 ADC_MAX = 1023.0            # 10-bit ADC
 COUNTS_PER_G = 1024.0       # MMA8452Q 12-bit at +/-2 g (use 4096 for MMA8451Q 14-bit)
 G_STD = 9.80665             # m/s^2 per g
 
-# --- High-pass filter, applied identically to the piezo and the accelerometer ---
-HP_CUTOFF = 100.0           # Hz
-HP_ORDER = 2
-
-# --- Trigger thresholds (on the high-passed signals) ---
+# --- Trigger thresholds (on the tare-subtracted signals) ---
 PIEZO_THRESHOLD_V = 0.02    # Volts
-ACC_THRESHOLD_G = 0.05      # g (vector magnitude of X, Y, Z)
+ACC_THRESHOLD_G = 0.05      # g (vector magnitude of tare-subtracted X, Y, Z)
 
 TARE_S = 1.0                # baseline recording time
 TIMEOUT_S = 300.0           # fallback max duration (5 minutes)
@@ -108,19 +103,6 @@ class SerialReader:
         return np.array(rows).reshape(-1, N_FIELDS)
 
 
-class StreamingHighPass:
-    """Butterworth high-pass that keeps its state between batches (multi-channel)."""
-
-    def __init__(self, b, a):
-        self.b, self.a, self.zi = b, a, None
-
-    def __call__(self, x):  # x: (N, channels)
-        if self.zi is None:
-            self.zi = np.outer(lfilter_zi(self.b, self.a), x[0])
-        y, self.zi = lfilter(self.b, self.a, x, axis=0, zi=self.zi)
-        return y
-
-
 def seconds_since(t_us, t0_us):
     """Elapsed seconds from the Arduino's micros() timestamps (handles wrap-around)."""
     return ((t_us - t0_us) % WRAP_US) / 1e6
@@ -145,10 +127,10 @@ def collect(reader, seconds):
     return np.vstack(chunks) if chunks else np.empty((0, N_FIELDS))
 
 
-def record(reader, hp):
+def record(reader, base):
     """Record continuously until the user hits ENTER or the hard timeout is reached."""
     reader.reset()
-    chunks, hp_chunks = [], []
+    chunks = []
     t0, t_acc, t_pz = None, None, None
     start = time.time()
 
@@ -168,20 +150,20 @@ def record(reader, hp):
                 t0 = rows[0, 0]
 
             acc, piezo, _ = to_signals(rows)
-            y = hp(np.column_stack([acc, piezo]))
+            acc_mag = np.linalg.norm(acc - base["acc_mean"], axis=1)
+            pz_dev = piezo - base["pz_mean"]
             t = seconds_since(rows[:, 0], t0)
             chunks.append(rows)
-            hp_chunks.append(y)
 
             # Check for initial threshold detection (first occurrence only)
             if t_acc is None:
-                hit = np.linalg.norm(y[:, :3], axis=1) >= ACC_THRESHOLD_G
+                hit = acc_mag >= ACC_THRESHOLD_G
                 if hit.any():
                     t_acc = t[hit.argmax()]
                     print(f" -> Accelerometer initial detection at t = {t_acc:.4f} s")
 
             if t_pz is None:
-                hit = np.abs(y[:, 3]) >= PIEZO_THRESHOLD_V
+                hit = np.abs(pz_dev) >= PIEZO_THRESHOLD_V
                 if hit.any():
                     t_pz = t[hit.argmax()]
                     print(f" -> Piezo initial detection at t = {t_pz:.4f} s")
@@ -194,15 +176,16 @@ def record(reader, hp):
 
     if not chunks:
         return None
-    return np.vstack(chunks), np.vstack(hp_chunks), t_acc, t_pz
+    return np.vstack(chunks), t_acc, t_pz
 
 
-def tare_baseline(tare_rows, b, a):
-    """Mean levels and high-passed noise RMS measured while the sensors are at rest."""
+def tare_baseline(tare_rows):
+    """Mean levels and RMS noise measured while the sensors are at rest."""
     acc, piezo, piezo_pp = to_signals(tare_rows)
-    y = StreamingHighPass(b, a)(np.column_stack([acc, piezo]))
-    acc_noise = np.sqrt(np.mean(np.sum(y[:, :3] ** 2, axis=1)))
-    pz_noise = np.sqrt(np.mean(y[:, 3] ** 2))
+    acc_dev = acc - acc.mean(axis=0)
+    pz_dev = piezo - piezo.mean()
+    acc_noise = np.sqrt(np.mean(np.sum(acc_dev ** 2, axis=1)))
+    pz_noise = np.sqrt(np.mean(pz_dev ** 2))
     return {
         "acc_mean": acc.mean(axis=0),
         "pz_mean": piezo.mean(),
@@ -233,17 +216,14 @@ def main():
 
         tare_t = seconds_since(tare_rows[:, 0], tare_rows[0, 0])
         tare_fs = (len(tare_rows) - 1) / tare_t[-1]
-        if HP_CUTOFF >= tare_fs / 2:
-            sys.exit(f"[ERROR] HP_CUTOFF ({HP_CUTOFF} Hz) must be below Nyquist ({tare_fs / 2:.0f} Hz).")
-        b, a = butter(HP_ORDER, HP_CUTOFF / (tare_fs / 2), btype="highpass")
 
-        base = tare_baseline(tare_rows, b, a)
+        base = tare_baseline(tare_rows)
         print(f"Line rate during tare: {tare_fs:.1f} Hz ({len(tare_rows)} samples)")
         print(f"Tare baseline piezo: {base['pz_mean']:.3f} V, "
               f"accel: X={base['acc_mean'][0]:+.3f} Y={base['acc_mean'][1]:+.3f} "
               f"Z={base['acc_mean'][2]:+.3f} g")
-        print(f"Noise after {HP_CUTOFF:.0f} Hz high-pass: piezo {base['pz_noise'] * 1000:.1f} mV RMS, "
-              f"accel {base['acc_noise'] * 1000:.1f} mg RMS")
+        print(f"Noise (tare RMS): piezo {base['pz_noise'] * 1000:.1f} mV, "
+              f"accel {base['acc_noise'] * 1000:.1f} mg")
         if PIEZO_THRESHOLD_V < 4 * base["pz_noise"]:
             print("[WARNING] Piezo threshold is below 4x the noise - may trigger falsely.")
         if ACC_THRESHOLD_G < 4 * base["acc_noise"]:
@@ -252,7 +232,7 @@ def main():
         # --- Step 2: Recording ---
         input("\nPress [ENTER] to start recording the experiment...")
         print(">>> RECORDING STARTED... Press [ENTER] at any time to stop the experiment <<<")
-        result = record(reader, StreamingHighPass(b, a))
+        result = record(reader, base)
     finally:
         ser.close()
 
@@ -269,15 +249,15 @@ def integrate_velocity(acc_ms2, t):
     return v
 
 
-def report_and_plot(rows, y, t_acc, t_pz, base):
+def report_and_plot(rows, t_acc, t_pz, base):
     t = seconds_since(rows[:, 0], rows[0, 0])
     n = len(t)
     true_fs = (n - 1) / t[-1]
 
     acc, piezo, piezo_pp = to_signals(rows)
     acc_rel = acc - base["acc_mean"]
-    acc_mag = np.linalg.norm(y[:, :3], axis=1)
-    pz_hp = y[:, 3]
+    acc_mag = np.linalg.norm(acc_rel, axis=1)
+    pz_dev = piezo - base["pz_mean"]
 
     # Envelopes (moving RMS)
     n_env = max(3, int(ENV_WINDOW_S * true_fs))
@@ -285,14 +265,14 @@ def report_and_plot(rows, y, t_acc, t_pz, base):
     def moving_rms(x):
         return np.sqrt(np.convolve(x ** 2, np.ones(n_env) / n_env, mode="same"))
 
-    env_acc, env_pz = moving_rms(acc_mag), moving_rms(pz_hp)
+    env_acc, env_pz = moving_rms(acc_mag), moving_rms(pz_dev)
     snr_acc = env_acc / base["acc_noise"]
     snr_pz = env_pz / base["pz_noise"]
     snr_pp = piezo_pp / max(base["pp_mean"], V_REF / ADC_MAX)
     corr = np.corrcoef(env_acc, env_pz)[0, 1]
 
     # Average velocity from the accelerometer, X axis only
-    v = integrate_velocity(y[:, 0:1] * G_STD, t)   # column 0 = X
+    v = integrate_velocity(acc_rel[:, 0:1] * G_STD, t)   # column 0 = X
     v -= v.mean(axis=0)
     speed = np.abs(v[:, 0])
     avg_speed = speed.mean()
@@ -328,7 +308,7 @@ def report_and_plot(rows, y, t_acc, t_pz, base):
 
     print("\n--- SENSITIVITY ---")
     print(f"Accelerometer: peak {acc_mag.max():.3f} g, peak envelope = {snr_acc.max():.1f}x noise")
-    print(f"Piezo:         peak {np.abs(pz_hp).max():.3f} V, peak envelope = {snr_pz.max():.1f}x noise")
+    print(f"Piezo:         peak {np.abs(pz_dev).max():.3f} V, peak envelope = {snr_pz.max():.1f}x noise")
     print(f"Piezo p-p (fast sampling): peak {piezo_pp.max():.3f} V = {snr_pp.max():.1f}x baseline")
     print(f"Envelope correlation (accel vs piezo): {corr:.2f}")
 
@@ -358,19 +338,19 @@ def report_and_plot(rows, y, t_acc, t_pz, base):
     ax_hp_acc.plot(tp, acc_mag[show], color="mediumseagreen", linewidth=1.0)
     ax_hp_acc.axhline(ACC_THRESHOLD_G, color="red", linestyle="--", alpha=0.6,
                       label=f"Threshold ({ACC_THRESHOLD_G} g)")
-    ax_hp_acc.set_title(f"3. Accelerometer magnitude, {HP_CUTOFF:.0f} Hz high-passed"
+    ax_hp_acc.set_title("3. Accelerometer magnitude (tare-subtracted)"
                         + (f" - first detected at t = {t_acc:.3f} s" if t_acc is not None else " - no initial detection"))
     ax_hp_acc.set_ylabel("|a| (g)")
     ax_hp_acc.legend(loc="upper left")
 
-    ax_hp_pz.plot(tp, pz_hp[show], color="dodgerblue", linewidth=1.0)
+    ax_hp_pz.plot(tp, pz_dev[show], color="dodgerblue", linewidth=1.0)
     ax_hp_pz.axhline(0, color="black", linewidth=0.8)
     ax_hp_pz.axhline(PIEZO_THRESHOLD_V, color="red", linestyle="--", alpha=0.6,
                      label=f"Threshold (+/-{PIEZO_THRESHOLD_V} V)")
     ax_hp_pz.axhline(-PIEZO_THRESHOLD_V, color="red", linestyle="--", alpha=0.6)
-    ax_hp_pz.set_title(f"4. Piezo, {HP_CUTOFF:.0f} Hz high-passed"
+    ax_hp_pz.set_title("4. Piezo (tare-subtracted)"
                        + (f" - first detected at t = {t_pz:.3f} s" if t_pz is not None else " - no initial detection"))
-    ax_hp_pz.set_ylabel("Filtered (V)")
+    ax_hp_pz.set_ylabel("Deviation (V)")
     ax_hp_pz.legend(loc="upper left")
 
     floor = 0.1
@@ -394,9 +374,10 @@ def report_and_plot(rows, y, t_acc, t_pz, base):
         if t_pz is not None:
             ax.axvline(t_pz, color="dodgerblue", linestyle=":", linewidth=1.2, label="Piezo Init Detect" if ax == ax_acc else "")
 
-    fig.suptitle(f"Average velocity (accelerometer X): {avg_speed:.4f} m/s "
-                 f"({avg_speed * 1000:.1f} mm/s)", fontsize=14, fontweight="bold")
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.suptitle("Raw piezoresistive vibration sensor\n"
+                 f"Average velocity (accelerometer X): {avg_speed:.4f} m/s ({avg_speed * 1000:.1f} mm/s)",
+                 fontsize=14, fontweight="bold")
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
     plt.show()
 
 
