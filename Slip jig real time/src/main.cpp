@@ -13,7 +13,7 @@ constexpr uint32_t SERIAL_BAUD = 115200;
 
 // Output rate when the accelerometer is disabled (piezo-only mode).
 // With the accelerometer enabled, lines are sent at its data-ready rate.
-constexpr uint32_t PIEZO_ONLY_RATE_HZ = 1;
+constexpr uint32_t PIEZO_ONLY_RATE_HZ = 300;
 
 // =====================================================================
 //  PINS (ESP32-C6)
