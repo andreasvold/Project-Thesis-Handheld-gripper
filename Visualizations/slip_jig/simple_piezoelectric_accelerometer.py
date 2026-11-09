@@ -15,9 +15,9 @@ import numpy as np
 import serial
 import serial.tools.list_ports
 
-BAUD_RATE = 250000      # must match Serial.begin() in the firmware
-V_REF = 5.0             # ADC reference voltage
-ADC_MAX = 1023.0        # 10-bit ADC
+BAUD_RATE = 115200      # must match Serial.begin() in the firmware
+V_REF = 3.3             # ADC reference voltage
+ADC_MAX = 4095.0        # 10-bit ADC
 COUNTS_PER_G = 1024.0   # MMA8452Q 12-bit, +/-2 g (use 4096 for MMA8451Q)
 WINDOW_S = 5.0          # seconds of history shown
 UPDATE_S = 0.05         # redraw interval

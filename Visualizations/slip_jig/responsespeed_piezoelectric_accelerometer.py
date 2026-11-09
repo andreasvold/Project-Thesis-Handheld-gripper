@@ -37,8 +37,8 @@ except ImportError:
 
 # --- Configuration ---
 BAUD_RATE = 250000          # must match Serial.begin() in the firmware
-V_REF = 5.0                 # ADC reference voltage (3.3 on 3.3 V boards)
-ADC_MAX = 1023.0            # 10-bit ADC
+V_REF = 3.3                 # ADC reference voltage (3.3 on 3.3 V boards)
+ADC_MAX = 4095.0            # 10-bit ADC
 COUNTS_PER_G = 1024.0       # MMA8452Q 12-bit at +/-2 g (use 4096 for MMA8451Q 14-bit)
 G_STD = 9.80665             # m/s^2 per g
 
