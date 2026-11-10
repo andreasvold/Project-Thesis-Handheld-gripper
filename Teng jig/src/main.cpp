@@ -15,7 +15,7 @@ const uint8_t LOADCELL_DOUT_PIN = 4;
 const uint8_t LOADCELL_SCK_PIN  = 2;
 
 // Stop the jig when the absolute change in load reaches this value.
-const long    LOAD_CHANGE_LIMIT = 10000;
+const long    LOAD_CHANGE_LIMIT = 5000;
 const uint8_t TARE_SAMPLES      = 100;    // ~2 s at 10 SPS
 
 // Direction that counts as "backward". If your motor turns the wrong way, swap these.

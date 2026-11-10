@@ -7,16 +7,19 @@
 constexpr uint32_t SERIAL_BAUD = 115200;      // ignored with native USB CDC
 
 // Samples recorded PER SENSOR in one debug capture.
-constexpr uint32_t CAPTURE_SAMPLES = 10000;
+constexpr uint32_t CAPTURE_SAMPLES = 5000;
 
 // Abort a capture after this long (protects against a sensor that never delivers).
 constexpr uint32_t CAPTURE_TIMEOUT_MS = 120000;
+
+// How often the board prints a progress line while recording.
+constexpr uint32_t PROGRESS_PERIOD_MS = 1000;
 
 // =====================================================================
 //  SENSOR SELECTION
 //  false = the sensor is not created: no bus traffic, no RAM reserved.
 // =====================================================================
-constexpr bool ENABLE_ACCEL = false;
+constexpr bool ENABLE_ACCEL = true;
 constexpr bool ENABLE_PIEZO = true;
 
 // =====================================================================

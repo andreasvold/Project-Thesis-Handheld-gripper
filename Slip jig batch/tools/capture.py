@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-Trigger a debug capture on the ESP32-C6 and save the dump to tools/captures/.
+Interactive debug capture for the ESP32-C6.
 
   python capture.py                 auto-detect the port
   python capture.py COM9            Windows
   python capture.py /dev/ttyACM0    Linux
-  python capture.py --status        print device status instead of capturing
+  python capture.py --status        print device status instead
 
+Flow:
+  1. The board arms and waits. Press Enter to START recording.
+  2. Recording runs. Press Enter to STOP early. If you don't, it stops by
+     itself when the buffers are full or the timeout is reached.
+  3. The board sends the data, and this script saves it to tools/captures/.
+
+Ctrl+C while armed cancels. Ctrl+C while recording stops and saves.
 Close the PlatformIO serial monitor first (only one program can open the port).
-Then plot with:  python plot_capture.py
 """
 import argparse
 import os
 import sys
+import threading
 import time
 from datetime import datetime
 
@@ -33,12 +40,29 @@ def find_port():
     return ports[0].device if ports else None
 
 
+def now_str():
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+
+def enter_watcher():
+    """Return an Event that is set when Enter is pressed. Waits in a background thread."""
+    event = threading.Event()
+
+    def wait():
+        try:
+            input()
+        except EOFError:
+            pass
+        event.set()
+
+    threading.Thread(target=wait, daemon=True).start()
+    return event
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Capture ESP32-C6 sensor data to a file.")
+    ap = argparse.ArgumentParser(description="Interactive debug capture for the ESP32-C6.")
     ap.add_argument("port", nargs="?", help="serial port (default: auto-detect)")
     ap.add_argument("--baud", type=int, default=BAUD_RATE)
-    ap.add_argument("--timeout", type=float, default=180.0,
-                    help="max seconds to wait for the device to finish")
     ap.add_argument("--status", action="store_true", help="print device status instead")
     args = ap.parse_args()
 
@@ -46,40 +70,82 @@ def main():
     if not port:
         sys.exit("No serial port found. Pass one explicitly, e.g. python capture.py COM9")
 
-    command = "status" if args.status else "capture"
-    end_marker = "#STATUS_END" if args.status else "#CAPTURE_END"
-
     print(f"Opening {port} @ {args.baud} baud ...")
     lines = []
-    finished = False
-    with serial.Serial(port, args.baud, timeout=0.5) as ser:
-        time.sleep(1.5)                       # some boards reset when the port opens
+    host_start = None
+    host_stop = None
+    aborted = False
+    state = "waiting"          # waiting -> armed -> recording -> stopping -> dumping
+    start_watch = None
+    stop_watch = None
+    end_marker = "#STATUS_END" if args.status else "#CAPTURE_END"
+
+    with serial.Serial(port, args.baud, timeout=0.2) as ser:
+        time.sleep(1.5)        # some boards reset when the port opens
         ser.reset_input_buffer()
-        ser.write(f"{command}\n".encode())
-        print(f"Sent '{command}', waiting for the device ...")
+        ser.write(b"status\n" if args.status else b"capture\n")
 
-        deadline = time.time() + args.timeout
-        while time.time() < deadline:
-            raw = ser.readline()
-            if not raw:
-                continue
-            line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
-            lines.append(line)
-            print(line)
-            if line.startswith(end_marker):
-                finished = True
-                break
+        done = False
+        while not done:
+            try:
+                # Act on Enter presses, checked on every pass
+                if state == "armed" and start_watch.is_set():
+                    ser.write(b"go\n")
+                    state = "recording"
+                    host_start = now_str()
+                    print(f">>> [{host_start}] START sent. Press Enter to STOP early, or let it finish.")
+                    stop_watch = enter_watcher()
+                elif state == "recording" and stop_watch.is_set():
+                    ser.write(b"stop\n")
+                    state = "stopping"
+                    print(f">>> [{now_str()}] STOP sent.")
 
-    if not finished:
-        sys.exit("Timed out before the device finished. Check the port and that the firmware is flashed.")
+                raw = ser.readline()
+                if not raw:
+                    continue
+                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                lines.append(line)
+                print(line)
+
+                if line.startswith(end_marker):
+                    done = True
+                elif line.startswith("#CAPTURE_ABORTED"):
+                    aborted = True
+                    done = True
+                elif args.status:
+                    pass
+                elif line.startswith("#ARMED") and state == "waiting":
+                    state = "armed"
+                    start_watch = enter_watcher()
+                    print(">>> Armed. Press Enter to START recording.")
+                elif line.startswith("#RECORDING_END"):
+                    host_stop = now_str()
+                    state = "dumping"
+                    print(f">>> [{host_stop}] RECORDING ENDED. Receiving data ...")
+
+            except KeyboardInterrupt:
+                if state == "recording":
+                    ser.write(b"stop\n")
+                    state = "stopping"
+                    print("\n>>> Ctrl+C: stopping recording and saving.")
+                elif state in ("waiting", "armed"):
+                    ser.write(b"abort\n")
+                    print("\n>>> Ctrl+C: aborting.")
+                else:
+                    print("\n>>> Ctrl+C: waiting for the device to finish ...")
+
     if args.status:
+        return
+    if aborted:
+        print("Capture aborted. Nothing saved.")
         return
 
     os.makedirs(CAPTURE_DIR, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(CAPTURE_DIR, f"capture_{stamp}.txt")
+    header = [f"#HOST_START {host_start or '?'}", f"#HOST_STOP {host_stop or '?'}"]
     with open(out_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        f.write("\n".join(header + lines) + "\n")
     print(f"\nSaved {out_path}")
     print(f'Plot with:  python plot_capture.py "{out_path}"')
 

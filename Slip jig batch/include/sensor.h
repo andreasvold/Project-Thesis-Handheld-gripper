@@ -44,6 +44,7 @@ public:
   virtual void update(uint32_t nowUs) = 0;        // call often; samples when due
   virtual bool captureDone() const = 0;           // true once CAPTURE_SAMPLES are stored
   virtual void printInfo(Print& out) const = 0;   // one status line
+  virtual uint32_t count() const = 0;             // samples stored so far
   virtual void dump(Print& out) const = 0;        // "#SENSOR ... #END" block
 
 protected:
@@ -70,6 +71,7 @@ public:
   }
 
   bool captureDone() const override { return buf_.full(); }
+  uint32_t count() const override { return buf_.count(); }
 
   void printInfo(Print& out) const override {
     out.print(name_);

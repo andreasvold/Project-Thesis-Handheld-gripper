@@ -9,7 +9,6 @@ namespace {
 constexpr uint8_t MAX_SENSORS = 8;
 Sensor* g_sensors[MAX_SENSORS];
 uint8_t g_sensorCount = 0;
-String  g_cmd;
 }
 
 // Takes ownership of s. Keeps it only if the hardware initialises.
@@ -53,9 +52,11 @@ void printStatus() {
 }
 
 void runCommand(const String& cmd) {
-  if (cmd == "capture")       runDebugCapture(g_sensors, g_sensorCount);
-  else if (cmd == "status")   printStatus();
-  else if (cmd == "help")     printHelp();
+  if (cmd == "capture")                        runDebugCapture(g_sensors, g_sensorCount);
+  else if (cmd == "status")                    printStatus();
+  else if (cmd == "help")                      printHelp();
+  else if (cmd == "go" || cmd == "stop" ||
+           cmd == "abort")                     { /* only meaningful during a capture */ }
   else {
     Serial.print(F("unknown command: "));
     Serial.println(cmd);
@@ -63,16 +64,8 @@ void runCommand(const String& cmd) {
 }
 
 void handleSerial() {
-  while (Serial.available()) {
-    char c = (char)Serial.read();
-    if (c == '\n' || c == '\r') {
-      g_cmd.trim();
-      if (g_cmd.length() > 0) runCommand(g_cmd);
-      g_cmd = "";
-    } else {
-      g_cmd += c;
-    }
-  }
+  String line;
+  while (pollLine(line)) runCommand(line);
 }
 
 void setup() {
@@ -87,6 +80,5 @@ void setup() {
 
 void loop() {
   // Idle: wait for commands. Sensors only sample during a capture.
-  // A future "run" mode would call update() on each sensor here.
   handleSerial();
 }

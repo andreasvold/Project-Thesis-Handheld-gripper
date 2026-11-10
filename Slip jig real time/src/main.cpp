@@ -4,7 +4,7 @@
 // =====================================================================
 //  FEATURE SELECTION  (true = enabled, false = disabled)
 // =====================================================================
-constexpr bool ENABLE_ACCEL = false;
+constexpr bool ENABLE_ACCEL = true;
 constexpr bool ENABLE_PIEZO = true;
 
 // Serial baud rate. Must match BAUD_RATE in the Python script and
@@ -13,7 +13,7 @@ constexpr uint32_t SERIAL_BAUD = 115200;
 
 // Output rate when the accelerometer is disabled (piezo-only mode).
 // With the accelerometer enabled, lines are sent at its data-ready rate.
-constexpr uint32_t PIEZO_ONLY_RATE_HZ = 300;
+constexpr uint32_t PIEZO_ONLY_RATE_HZ = 100;
 
 // =====================================================================
 //  PINS (ESP32-C6)
