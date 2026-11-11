@@ -7,7 +7,7 @@
 constexpr uint32_t SERIAL_BAUD = 115200;      // ignored with native USB CDC
 
 // Samples recorded PER SENSOR in one debug capture.
-constexpr uint32_t CAPTURE_SAMPLES = 5000;
+constexpr uint32_t CAPTURE_SAMPLES = 10000;
 
 // Abort a capture after this long (protects against a sensor that never delivers).
 constexpr uint32_t CAPTURE_TIMEOUT_MS = 120000;
@@ -51,6 +51,6 @@ constexpr bool ACCEL_HIGH_PASS = true;
 // =====================================================================
 //  PIEZO (ADC)
 // =====================================================================
-constexpr uint32_t PIEZO_SAMPLE_RATE_HZ = 2000;   // target rate; check achieved rate with --stats
+constexpr uint32_t PIEZO_SAMPLE_RATE_HZ = 10000;   // target rate; check achieved rate with --stats
 constexpr uint8_t  PIEZO_ADC_BITS       = 12;
 constexpr float    PIEZO_VREF_V         = 3.3f;   // only used to convert counts -> volts in plots

@@ -113,11 +113,13 @@ def main():
         ax.set_ylim(0, fmax)
         ax.set_title(f"{label} spectrogram   (slice {1000 * nfft / fs:.0f} ms, "
                      f"resolution {fs / nfft:.1f} Hz)")
-        ax.set_xlabel("Time from window start (s)")
+        # Keep the time label in one shared place below all panels. Repeating
+        # it on every axis makes it collide with the next panel's title.
         ax.set_ylabel("Frequency (Hz)")
         fig.colorbar(im, ax=ax, label=f"Power (dB re {unit}^2/Hz)")
 
-    fig.tight_layout()
+    fig.supxlabel("Time from window start (s)", y=0.015)
+    fig.tight_layout(rect=(0, 0.04, 1, 1), h_pad=2.0)
     show_and_save(fig, "spectrogram", path, name=args.name,
                   show=not args.no_show, auto_save=not args.no_save, save_path=args.save)
 
