@@ -7,7 +7,14 @@ Plot a capture saved by capture.py (or a raw dump copied from a terminal).
   python plot_capture.py --sensors accel --window 0 2.5
   python plot_capture.py --raw                    raw counts instead of g / V
   python plot_capture.py --stats                  timing and value statistics, no plot
-  python plot_capture.py FILE --save out.png --no-show
+  python plot_capture.py captures/capture_x.txt --save out.png --no-show
+  python plot_capture.py --name mytest            save as tools/plots/capture/mytest.png
+  python plot_capture.py --no-save                do not save the plot automatically
+
+After the plot window is closed, the figure is saved automatically to
+tools/plots/capture/, using the capture file's name (capture_x.png for
+capture_x.txt). Use --name to choose another name, or --no-save to turn
+saving off.
 """
 import argparse
 import glob
@@ -19,6 +26,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CAPTURE_DIR = os.path.join(HERE, "captures")
+PLOTS_DIR = os.path.join(HERE, "plots")
 
 
 class SensorCapture:
@@ -110,6 +118,55 @@ def parse_capture(path):
     return sensors
 
 
+def newest_capture():
+    files = glob.glob(os.path.join(CAPTURE_DIR, "*.txt"))
+    if not files:
+        sys.exit(f"No captures found in {CAPTURE_DIR}. Run capture.py first.")
+    return max(files, key=os.path.getmtime)
+
+
+# ---------------------------------------------------------------------
+# Saving plots (shared with plot_fft.py and plot_spectrogram.py)
+# ---------------------------------------------------------------------
+def make_plot_path(kind, capture_path, name=None):
+    """
+    Path for a saved plot. By default it uses the capture file's name, so
+    captures/capture_x.txt -> plots/fft/capture_x.png. Pass name to choose a
+    different name. Existing files are never overwritten: _2, _3, ... is added.
+    """
+    folder = os.path.join(PLOTS_DIR, kind)
+    os.makedirs(folder, exist_ok=True)
+    if name:
+        base = os.path.basename(name)
+    else:
+        base = os.path.splitext(os.path.basename(capture_path))[0]
+    if base.lower().endswith(".png"):
+        base = base[:-4]
+    path = os.path.join(folder, base + ".png")
+    n = 2
+    while os.path.exists(path):
+        path = os.path.join(folder, f"{base}_{n}.png")
+        n += 1
+    return path
+
+
+def show_and_save(fig, kind, capture_path, name=None,
+                  show=True, auto_save=True, save_path=None):
+    """Show the figure (blocks until the window is closed), then save it."""
+    if show:
+        plt.show()
+    if auto_save:
+        path = make_plot_path(kind, capture_path, name)
+        fig.savefig(path, dpi=150)
+        print(f"Saved plot to {path}")
+    if save_path:
+        fig.savefig(save_path, dpi=150)
+        print(f"Saved figure to {save_path}")
+
+
+# ---------------------------------------------------------------------
+# Statistics and plotting
+# ---------------------------------------------------------------------
 def print_stats(cap, raw):
     t_us = cap.data[:, 0]
     n = len(t_us)
@@ -134,7 +191,8 @@ def print_stats(cap, raw):
               f"mean {v.mean():12.4f}  std {v.std():10.4f}  [{unit}]")
 
 
-def plot_captures(caps, window=None, raw=False, save=None, show=True):
+def plot_captures(caps, capture_path, window=None, raw=False,
+                  save_path=None, show=True, auto_save=True, name=None):
     fig, axes = plt.subplots(len(caps), 1, figsize=(11, 3.4 * len(caps)), squeeze=False)
 
     for ax, cap in zip(axes[:, 0], caps):
@@ -155,18 +213,8 @@ def plot_captures(caps, window=None, raw=False, save=None, show=True):
         ax.legend(loc="upper right", ncol=min(3, len(cap.channels)))
 
     fig.tight_layout()
-    if save:
-        fig.savefig(save, dpi=150)
-        print(f"Saved figure to {save}")
-    if show:
-        plt.show()
-
-
-def newest_capture():
-    files = glob.glob(os.path.join(CAPTURE_DIR, "*.txt"))
-    if not files:
-        sys.exit(f"No captures found in {CAPTURE_DIR}. Run capture.py first.")
-    return max(files, key=os.path.getmtime)
+    show_and_save(fig, "capture", capture_path, name=name,
+                  show=show, auto_save=auto_save, save_path=save_path)
 
 
 def main():
@@ -178,8 +226,12 @@ def main():
                     help="time window in seconds")
     ap.add_argument("--raw", action="store_true", help="plot raw counts instead of g / V")
     ap.add_argument("--stats", action="store_true", help="print statistics, no plot")
-    ap.add_argument("--save", metavar="FILE.png", help="save the figure to this file")
+    ap.add_argument("--save", metavar="FILE.png", help="also save the figure to this file")
     ap.add_argument("--no-show", action="store_true", help="do not open a plot window")
+    ap.add_argument("--no-save", action="store_true",
+                    help="do not save the plot to tools/plots/capture/")
+    ap.add_argument("--name", metavar="NAME",
+                    help="name for the saved plot, without .png (default: capture file name)")
     args = ap.parse_args()
 
     path = args.file or newest_capture()
@@ -201,8 +253,9 @@ def main():
             print_stats(cap, args.raw)
         return
 
-    plot_captures(caps, window=args.window, raw=args.raw,
-                  save=args.save, show=not args.no_show)
+    plot_captures(caps, path, window=args.window, raw=args.raw,
+                  save_path=args.save, show=not args.no_show,
+                  auto_save=not args.no_save, name=args.name)
 
 
 if __name__ == "__main__":
