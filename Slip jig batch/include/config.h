@@ -19,8 +19,9 @@ constexpr uint32_t PROGRESS_PERIOD_MS = 1000;
 //  SENSOR SELECTION
 //  false = the sensor is not created: no bus traffic, no RAM reserved.
 // =====================================================================
-constexpr bool ENABLE_ACCEL = true;
-constexpr bool ENABLE_PIEZO = true;
+constexpr bool ENABLE_ACCEL = false;
+constexpr bool ENABLE_PIEZO = false;
+constexpr bool ENABLE_CAPACITANCE = true;
 
 // =====================================================================
 //  PINS (ESP32-C6)
@@ -28,6 +29,10 @@ constexpr bool ENABLE_PIEZO = true;
 constexpr uint8_t PIN_SDA   = 4;
 constexpr uint8_t PIN_SCL   = 5;
 constexpr uint8_t PIEZO_PIN = 1;              // ADC1 channel (C6: GPIO0-GPIO6)
+constexpr uint8_t CAPACITANCE_RESET_PIN = 7;
+constexpr uint8_t CAPACITANCE_CS_PIN = 10;
+constexpr uint8_t CAPACITANCE_CREF_PIN = 11;
+constexpr uint8_t CAPACITANCE_ADC_PIN = 2;    // ADC1 channel (C6: GPIO0-GPIO6)
 
 // =====================================================================
 //  I2C / ACCELEROMETER (MMA8452Q or MMA8451Q, auto-detected)
@@ -54,3 +59,11 @@ constexpr bool ACCEL_HIGH_PASS = true;
 constexpr uint32_t PIEZO_SAMPLE_RATE_HZ = 10000;   // target rate; check achieved rate with --stats
 constexpr uint8_t  PIEZO_ADC_BITS       = 12;
 constexpr float    PIEZO_VREF_V         = 3.3f;   // only used to convert counts -> volts in plots
+
+// =====================================================================
+//  CAPACITANCE SENSOR (CHARGE AMPLIFIER)
+// =====================================================================
+constexpr uint32_t CAPACITANCE_SAMPLE_RATE_HZ = 1000;
+constexpr uint8_t CAPACITANCE_RESET_US = 5;
+constexpr uint8_t CAPACITANCE_SETTLE_US = 5;
+constexpr uint8_t CAPACITANCE_ADC_BITS = 12;

@@ -11,11 +11,13 @@ include/
   sensor.h           Sensor interface, CaptureBuffer, SensorT<CH> base class
   accel_mma8452.h    accelerometer driver (MMA8452Q / MMA8451Q)
   piezo.h            piezo ADC driver
+  capacitance_sensor.h charge-amplifier capacitance sensor
   debug_capture.h    capture + dump routine
 src/
   main.cpp           sensor registry, serial command handling
   accel_mma8452.cpp
   piezo.cpp
+  capacitance_sensor.cpp
   debug_capture.cpp
 tools/
   capture.py         send "capture" to the board, save the dump to tools/captures/
@@ -67,6 +69,15 @@ t_us,value
 ```
 
 `scale` and `unit` are written by each sensor, so the Python tools need no sensor-specific knowledge. Adding a new sensor does not require changing the plotting code.
+
+## Charge-amplifier capacitance sensor
+
+The `capacitance` sensor records one unscaled `raw_cycle` value per sample: the
+two-polarity charge-amplifier result (`stepB - stepA`) in ESP32 ADC counts.
+Configure its GPIOs and sample rate in `include/config.h`. Defaults are reset
+GPIO7, Cs GPIO10, Cref GPIO11, and ADC input GPIO2. The ESP32-C6 uses 12-bit
+ADC readings and 3.3 V GPIO logic; check that the external analog circuit and
+switch are compatible with 3.3 V before connecting them.
 
 ## Reading the diagnostics
 

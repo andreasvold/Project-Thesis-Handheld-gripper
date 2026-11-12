@@ -6,9 +6,9 @@
 // Pins are FIXED because the driver writes PORTB directly, so that the Cs and Cref
 // edges happen at exactly the same instant:
 //
-//   D8  (PB0) -> 4066 control pin 13   (reset switch across feedback capacitor C)
-//   D9  (PB1) -> Cs   drive
-//   D10 (PB2) -> Cref drive (always the opposite level of D9)
+//   D5  (PB0) -> 4066 control pin 13   (reset switch across feedback capacitor C)
+//   D6  (PB1) -> Cs   drive
+//   D7 (PB2) -> Cref drive (always the opposite level of D9)
 //   A0        <- op-amp output
 //
 // One measurement cycle (see rawCycle()):

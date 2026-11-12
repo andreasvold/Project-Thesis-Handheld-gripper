@@ -3,6 +3,7 @@
 #include "sensor.h"
 #include "accel_mma8452.h"
 #include "piezo.h"
+#include "capacitance_sensor.h"
 #include "debug_capture.h"
 
 namespace {
@@ -30,6 +31,7 @@ void addSensor(Sensor* s) {
 void registerSensors() {
   if (ENABLE_ACCEL) addSensor(new AccelMMA8452());
   if (ENABLE_PIEZO) addSensor(new PiezoSensor());
+  if (ENABLE_CAPACITANCE) addSensor(new CapacitanceSensor());
   // To add a sensor: write its module, add a flag to config.h, then:
   // if (ENABLE_MYSENSOR) addSensor(new MySensor());
 }
