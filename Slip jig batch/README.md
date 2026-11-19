@@ -22,6 +22,7 @@ src/
 tools/
   capture.py         send "capture" to the board, save the dump to tools/captures/
   plot_capture.py    parse a capture, plot all or selected sensors, print statistics
+  plot_analysis.py  generate FFT and spectrogram plots for one capture
 ```
 
 ## Quick start
@@ -30,6 +31,7 @@ tools/
 2. Build and upload: `pio run -t upload`
 3. Close any serial monitor, then run `python tools/capture.py` (add the port if auto-detect fails).
 4. Plot: `python tools/plot_capture.py`
+5. Generate FFT and spectrogram plots: `python tools/plot_analysis.py tools/captures/<capture-file>.txt`
 
 Python dependencies: `pip install pyserial matplotlib numpy`
 
@@ -39,8 +41,14 @@ python tools/plot_capture.py --sensors piezo
 python tools/plot_capture.py --sensors accel --window 0 2
 python tools/plot_capture.py --raw --save accel_raw.png --no-show
 python tools/plot_capture.py --stats
+python tools/plot_analysis.py tools/captures/Mov_jengstang_sandpaperPiezoPLA.txt
 python tools/capture.py --status
 ```
+
+`plot_analysis.py` saves both analyses automatically to `tools/plots/fft/` and
+`tools/plots/spectrogram/`, using the capture filename for each plot. If a plot
+with that name already exists, a numbered suffix is added rather than
+overwriting it.
 
 ## Serial commands (for a terminal monitor)
 

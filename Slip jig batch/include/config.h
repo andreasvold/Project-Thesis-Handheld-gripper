@@ -63,7 +63,28 @@ constexpr float    PIEZO_VREF_V         = 3.3f;   // only used to convert counts
 // =====================================================================
 //  CAPACITANCE SENSOR (CHARGE AMPLIFIER)
 // =====================================================================
-constexpr uint32_t CAPACITANCE_SAMPLE_RATE_HZ = 1000;
+constexpr uint32_t CAPACITANCE_SAMPLE_RATE_HZ = 3000;
 constexpr uint8_t CAPACITANCE_RESET_US = 5;
 constexpr uint8_t CAPACITANCE_SETTLE_US = 5;
 constexpr uint8_t CAPACITANCE_ADC_BITS = 12;
+
+enum class CapacitanceFilterType : uint8_t {
+  Butterworth,
+  ChebyshevI
+};
+
+constexpr bool CAPACITANCE_BANDPASS_ENABLED = false;
+constexpr CapacitanceFilterType CAPACITANCE_FILTER_TYPE =
+    CapacitanceFilterType::Butterworth;
+constexpr float CAPACITANCE_FILTER_LOW_HZ = 100.0f;
+constexpr float CAPACITANCE_FILTER_HIGH_HZ = 200.0f;
+constexpr uint8_t CAPACITANCE_FILTER_ORDER = 2;  // 2nd-order prototype; two sections make a 4th-order band-pass.
+constexpr float CAPACITANCE_CHEBYSHEV_RIPPLE_DB = 1.0f;  // Used only by ChebyshevI.
+
+static_assert(CAPACITANCE_FILTER_LOW_HZ > 0.0f, "Band-pass low cutoff must be positive");
+static_assert(CAPACITANCE_FILTER_LOW_HZ < CAPACITANCE_FILTER_HIGH_HZ,
+              "Band-pass low cutoff must be below its high cutoff");
+static_assert(CAPACITANCE_FILTER_HIGH_HZ < CAPACITANCE_SAMPLE_RATE_HZ / 2.0f,
+              "Band-pass cutoffs must be below the Nyquist frequency");
+static_assert(CAPACITANCE_FILTER_ORDER == 2,
+              "The capacitance filter currently supports order 2 only");
